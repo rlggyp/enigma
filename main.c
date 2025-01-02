@@ -1,73 +1,99 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-void UpperCase(char *input, const size_t *len) {
-  for (int i = 0; i < *len; ++i) {
-    char *data = &input[i];
-    if (*data == 0)
-      break;
+#define I   "EKMFLGDQVZNTOWYHXUSPAIBRCJ"
+#define II  "AJDKSIRUXBLHWTMCQGZNPYFVOE"
+#define III "BDFHJLCPRTXVZNYEIWGAKMUSQO"
+#define UKW_C "FVPJIAOYEDRZXWGCTKUQSBNMHL"
 
-    if (*data < 'A' || *data > 'z' || (*data > 'Z' && *data < 'a'))
-      continue;
+struct Rotor {
+  char wiring[26];
+  char notch;
+  char offset;
+};
 
-    if (*data >= 'a' && *data <= 'z')
+void UpperCase(char *data) {
+  while (*data >= 32) {
+    if (*data >= 'a' && *data <= 'z') {
       *data -= 32;
+    }
+
+    data++;
   }
 }
 
-void Encrypt(char *right, const char *left, const char offset) {
-  char i = ((*right - 'A') + offset) % 26;
-  
-  *right = left[i];
+char GetNotchIndex(const char *wiring, const char notch) {
+  for (int i = 0; i < 26; ++i) {
+    if (wiring[i] == notch)
+      return i;
+  }
 }
 
-void Backward(char *right, const char *left, const char offset) {
-  for (short i = 0; i < 26; ++i) {
-    if (*right == left[(i + offset) % 26]) {
-      *right = 'A' + i;
+char RotateRotor(struct Rotor *rotor) {
+  ++rotor->offset;
+  return rotor->offset % 26 == rotor->notch;
+}
+
+void ForwardEncrypt(const struct Rotor *rotor, char *data) {
+  char i = ((*data - 'A') + rotor->offset) % 26;
+  
+  *data = rotor->wiring[i];
+}
+
+void Reflector(const char *wiring, char *data) {
+  char i = (*data - 'A') % 26;
+  
+  *data = wiring[i];
+}
+
+void BackwardEncrypt(const struct Rotor *rotor, char *data) {
+  for (char i = 0; i < 26; ++i) {
+    if (*data == rotor->wiring[(i + rotor->offset) % 26]) {
+      *data = 'A' + i;
       break;
     }
   }
 }
 
+void SetRotor(struct Rotor *rotor, const char *wheel, const char notch, const char offset) {
+  strcpy(rotor->wiring, wheel);
+  rotor->notch = GetNotchIndex(wheel, notch);
+  rotor->offset = offset;
+}
+
 int main() {
-  // rotor configuration 
-  // most left rotor_1
-  // middle rotor_2
-  // most right rotor_3
+  struct Rotor rotor[3];
+  char *reflector = UKW_C;
 
-                // ABCDEFGHIJKLMNOPQRSTUVWXYZ
-  char *rotor_1 = "EKMFLGDQVZNTOWYHXUSPAIBRCJ"; // I
-                // ABCDEFGHIJKLMNOPQRSTUVWXYZ
-  char *rotor_2 = "AJDKSIRUXBLHWTMCQGZNPYFVOE"; // II
-                // ABCDEFGHIJKLMNOPQRSTUVWXYZ
-  char *rotor_3 = "BDFHJLCPRTXVZNYEIWGAKMUSQO"; // III
+  SetRotor(&rotor[0], I, 'Y', 0);
+  SetRotor(&rotor[1], II, 'M', 0);
+  SetRotor(&rotor[2], III, 'D', 0);
 
-                  // ABCDEFGHIJKLMNOPQRSTUVWXYZ
-  char *reflector = "FVPJIAOYEDRZXWGCTKUQSBNMHL"; // UKW-C
+  printf("Enter text: ");
 
   char *input = NULL;
   size_t len;
-  printf("Enter text: ");
   getline(&input, &len, stdin);
-  UpperCase(input, &len);
+  UpperCase(input);
 
-  char offset = 0;
-
-  for (int i = 0; i < len; ++i) {
-    if (input[i] < 32)
-      break;
-    else if(input[i] == 32)
+  for (int i = 0; i < len && input[i] >= 32; ++i) {
+    if((!(input[i] >= 'A' && input[i] <= 'Z') || (input[i] >= 'a' && input[i] <= 'z')))
       continue;
 
-    ++offset;
-    Encrypt(&input[i], rotor_3, offset);
-    Encrypt(&input[i], rotor_2, 0);
-    Encrypt(&input[i], rotor_1, 0);
-    Encrypt(&input[i], reflector, 0);
-    Backward(&input[i], rotor_1, 0);
-    Backward(&input[i], rotor_2, 0);
-    Backward(&input[i], rotor_3, offset);
+    if (RotateRotor(&rotor[2])) {
+      if (RotateRotor(&rotor[1])) {
+        RotateRotor(&rotor[0]);
+      }
+    }
+
+    ForwardEncrypt(&rotor[2], &input[i]);
+    ForwardEncrypt(&rotor[1], &input[i]);
+    ForwardEncrypt(&rotor[0], &input[i]);
+    Reflector(reflector, &input[i]);
+    BackwardEncrypt(&rotor[0], &input[i]);
+    BackwardEncrypt(&rotor[1], &input[i]);
+    BackwardEncrypt(&rotor[2], &input[i]);
   }
 
   printf("Encrypted: %s", input);
